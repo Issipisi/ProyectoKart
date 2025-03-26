@@ -14,17 +14,12 @@ import lombok.*;
 public class TarifaEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
+    @Column(unique = true, nullable = false)
     Long id;
 
-    @Column(name = "costo")
     int costo;
-
-    @Column(name = "duracion")
     int duracion;
-
     //Mediante el uso de 1 o 0 se verá si la tarifa es especial o estándar
-    @Column(name = "esEspecial")
-    int esEspecial;
+    int es_especial;
 
 }

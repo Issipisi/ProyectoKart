@@ -69,6 +69,7 @@
 						</path>
 					</annotationProcessorPaths>
 				</configuration>
+				<finalname>ProyectoKart</finalname>
 			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
