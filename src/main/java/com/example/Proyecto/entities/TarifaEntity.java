@@ -18,8 +18,7 @@ public class TarifaEntity {
     Long id;
 
     int costo;
-    int duracion;
+    int vueltas;
     //Mediante el uso de 1 o 0 se verá si la tarifa es especial o estándar
-    int es_especial;
 
 }
