@@ -19,6 +19,6 @@ public class TarifaEntity {
 
     int costo;
     int vueltas;
-    //Mediante el uso de 1 o 0 se verá si la tarifa es especial o estándar
+
 
 }

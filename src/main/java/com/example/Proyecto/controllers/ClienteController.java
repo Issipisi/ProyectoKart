@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/clientes") // Ruta base para todas las operaciones de clientes
+@RequestMapping("/api/clientes") // Ruta base para todas las operaciones de Cliente
 public class ClienteController {
 
     private final ClienteService clienteService;
