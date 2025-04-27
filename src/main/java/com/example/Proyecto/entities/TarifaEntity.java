@@ -17,8 +17,10 @@ public class TarifaEntity {
     @Column(unique = true, nullable = false)
     Long id;
 
-    int costo;
+    double costo;
     int vueltas;
+    int duracion;
+    boolean es_especial;
 
 
 }

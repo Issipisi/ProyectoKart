@@ -19,8 +19,6 @@ public class ClienteEntity {
     int total_reservas;
 
 
-
-
 }
 
 

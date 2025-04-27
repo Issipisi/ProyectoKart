@@ -26,24 +26,29 @@ public class TarifaController {
         return new ResponseEntity<>(nueva, HttpStatus.CREATED);
     }
 
+    // Buscar tarifa por cantidad de vueltas
+    @GetMapping("/buscarPorVueltas")
+    public ResponseEntity<TarifaEntity> buscarPorVueltas(@RequestParam int vueltas) {
+        Optional<TarifaEntity> tarifa = tarifaService.buscarPorVueltas(vueltas);
+        return tarifa.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     // Listar todas las tarifas
     @GetMapping
     public ResponseEntity<List<TarifaEntity>> listarTodas() {
         return ResponseEntity.ok(tarifaService.obtenerTodas());
     }
 
-    // Buscar tarifa por ID
+    /*
+    @GetMapping("/tarifas/activas")
+    public List<TarifaEntity> obtenerTarifasPorTipo(@RequestParam boolean esEspecial)
+    */
+
+    /* Buscar tarifa por ID
     @GetMapping("/{id}")
     public ResponseEntity<TarifaEntity> buscarPorId(@PathVariable Long id) {
         Optional<TarifaEntity> tarifa = tarifaService.buscarPorId(id);
-        return tarifa.map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
-    }
-
-    // Buscar tarifa por cantidad de vueltas
-    @GetMapping("/buscarPorVueltas")
-    public ResponseEntity<TarifaEntity> buscarPorVueltas(@RequestParam int vueltas) {
-        Optional<TarifaEntity> tarifa = tarifaService.buscarPorVueltas(vueltas);
         return tarifa.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -64,5 +69,5 @@ public class TarifaController {
     public ResponseEntity<Void> eliminarTarifa(@PathVariable Long id) {
         tarifaService.eliminarTarifa(id);
         return ResponseEntity.noContent().build();
-    }
+    }*/
 }

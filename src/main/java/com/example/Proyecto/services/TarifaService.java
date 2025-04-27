@@ -25,20 +25,22 @@ public class TarifaService {
         return tarifaRepository.save(tarifa);
     }
 
+    // Buscar tarifa por Vueltas
+    public Optional<TarifaEntity> buscarPorVueltas(int vueltas) {
+        return tarifaRepository.findByVueltas(vueltas);
+    }
+
     // Obtener todas las tarifas
     public List<TarifaEntity> obtenerTodas() {
         return tarifaRepository.findAll();
     }
 
-    // Buscar tarifa por ID
+    /* Buscar tarifa por ID
     public Optional<TarifaEntity> buscarPorId(Long id) {
         return tarifaRepository.findById(id);
     }
 
-    // Buscar tarifa por Vueltas
-    public Optional<TarifaEntity> buscarPorVueltas(int vueltas) {
-        return tarifaRepository.findByVueltas(vueltas);
-    }
+
 
     // Actualizar tarifa
     public TarifaEntity actualizarTarifa(Long id, TarifaEntity actualizada) {
@@ -54,5 +56,5 @@ public class TarifaService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Tarifa no encontrada");
         }
         tarifaRepository.deleteById(id);
-    }
+    }*/
 }
