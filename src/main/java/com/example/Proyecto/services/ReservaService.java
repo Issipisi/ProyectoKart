@@ -4,7 +4,6 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.core.io.FileSystemResource;
 
-import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 
 import com.example.Proyecto.entities.ClienteEntity;
@@ -21,7 +20,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -49,33 +47,73 @@ public class ReservaService {
     // Crear reserva
     public ReservaEntity crearReserva(
             Long clienteId,
-            Long tarifaId,
+            int cantidadVueltas,
             int cantidadPersonas,
-            String fechaStr,
+            String fecha,
             boolean clienteFrecuente,
             boolean diaEspecial
     ) {
-        TarifaEntity tarifa = tarifaRepository.findById(tarifaId)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Tarifa no encontrada"));
+        ClienteEntity cliente = clienteRepository.findById(clienteId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
+
+        TarifaEntity tarifa = calcularTarifaAutomatica(cantidadVueltas, diaEspecial);
 
         double montoBase = tarifa.getCosto();
         double descuento = calcularMejorDescuento(cantidadPersonas, clienteFrecuente, diaEspecial);
         double montoFinal = montoBase * (1 - descuento);
         String tipoDescuento = determinarTipoDescuento(descuento, cantidadPersonas, clienteFrecuente, diaEspecial);
 
-        LocalDateTime fecha = LocalDateTime.now();
+        LocalDateTime fechaHora = LocalDateTime.parse(fecha);
 
         ReservaEntity reserva = ReservaEntity.builder()
                 .clienteId(clienteId)
-                .tarifaId(tarifaId)
+                .tarifaId(tarifa.getId())
                 .cantidadPersonas(cantidadPersonas)
-                .fecha(fecha)
+                .fecha(fechaHora)
                 .montoBase(montoBase)
                 .montoFinal(montoFinal)
                 .tipoDescuentoAplicado(tipoDescuento)
                 .build();
-
         return reservaRepository.save(reserva);
+    }
+
+    // Calcula las tarifas de forma automática en base a la reserva
+    private TarifaEntity calcularTarifaAutomatica(int vueltas, boolean diaEspecial) {
+        int minutos = 0;
+        double costo = 0;
+
+        switch (vueltas) {
+            case 10:
+                minutos = 30;
+                costo = diaEspecial ? 18000 : 15000;
+                break;
+            case 15:
+                minutos = 35;
+                costo = diaEspecial ? 23000 : 20000;
+                break;
+            case 20:
+                minutos = 40;
+                costo = diaEspecial ? 28000 : 25000;
+                break;
+            default:
+                throw new IllegalArgumentException("Número de vueltas invalid");
+        }
+        Optional<TarifaEntity> tarifaExistente = tarifaRepository.findByVueltasAndCostoAndDuracion(
+                vueltas, costo, minutos
+        );
+
+        if (tarifaExistente.isPresent()) {
+            return tarifaExistente.get();
+        } else {
+            // Crear nueva tarifa
+            TarifaEntity nuevaTarifa = TarifaEntity.builder()
+                    .vueltas(vueltas)
+                    .duracion(minutos)
+                    .costo(costo)
+                    .build();
+            return tarifaRepository.save(nuevaTarifa);
+        }
+
     }
 
     // Lógica para calcular el mejor descuento desde backend
@@ -96,18 +134,8 @@ public class ReservaService {
     }
 
     // Listar todas las reservas con nombres de cliente (modo texto)
-    public List<String> listarReservasConCliente() {
-        List<ReservaEntity> reservas = reservaRepository.findAll();
-
-        return reservas.stream().map(reserva -> {
-            Optional<ClienteEntity> cliente = clienteRepository.findById(reserva.getClienteId());
-            String nombre = cliente.map(ClienteEntity::getNombre).orElse("Cliente no encontrado");
-            return "Reserva # " + reserva.getId() +
-                    " - Cliente: " + nombre +
-                    ", Fecha: " + reserva.getFecha() +
-                    ", Personas: " + reserva.getCantidadPersonas() +
-                    ", Monto Final: $" + reserva.getMontoFinal();
-        }).collect(Collectors.toList());
+    public List<ReservaEntity> listarReservas() {
+        return reservaRepository.findAll();
     }
 
     // Obtener reserva por ID con detalles formateados
@@ -227,7 +255,6 @@ public class ReservaService {
             ingresosPorPersonas.put(personas, ingresosPorPersonas.getOrDefault(personas, 0.0) +
                     reserva.getMontoFinal());
         }
-
         return ingresosPorPersonas;
     }
 

@@ -11,6 +11,7 @@ import java.util.List;
 
 @Controller
 @RestController
+@CrossOrigin(origins = "http://localhost:5173")
 @RequestMapping("/api/reservas")
 public class ReservaController {
 
@@ -24,7 +25,7 @@ public class ReservaController {
     @PostMapping
     public ResponseEntity<ReservaEntity> crearReserva(
             @RequestParam Long clienteId,
-            @RequestParam Long tarifaId,
+            @RequestParam int cantidadVueltas,
             @RequestParam int cantidadPersonas,
             @RequestParam String fecha,
             @RequestParam boolean clienteFrecuente,
@@ -32,7 +33,7 @@ public class ReservaController {
     ) {
         ReservaEntity reserva = reservaService.crearReserva(
                 clienteId,
-                tarifaId,
+                cantidadVueltas,
                 cantidadPersonas,
                 fecha,
                 clienteFrecuente,
@@ -43,8 +44,8 @@ public class ReservaController {
 
     // Listar todas las reservas
     @GetMapping
-    public ResponseEntity<List<String>> listarReservasConCliente() {
-        return ResponseEntity.ok(reservaService.listarReservasConCliente());
+    public ResponseEntity<List<ReservaEntity>> listarReservas() {
+        return ResponseEntity.ok(reservaService.listarReservas());
     }
 
     // Ver una reserva por ID con detalle

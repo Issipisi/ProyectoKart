@@ -9,6 +9,7 @@ import lombok.*;
 @Getter
 @Setter
 @Data
+@Builder
 @Table(name = "tarifa")
 
 public class TarifaEntity {
@@ -20,7 +21,6 @@ public class TarifaEntity {
     double costo;
     int vueltas;
     int duracion;
-    boolean es_especial;
 
 
 }
