@@ -35,26 +35,4 @@ public class TarifaService {
         return tarifaRepository.findAll();
     }
 
-    /* Buscar tarifa por ID
-    public Optional<TarifaEntity> buscarPorId(Long id) {
-        return tarifaRepository.findById(id);
-    }
-
-
-
-    // Actualizar tarifa
-    public TarifaEntity actualizarTarifa(Long id, TarifaEntity actualizada) {
-        return tarifaRepository.findById(id).map(tarifa -> {
-            tarifa.setCosto(actualizada.getCosto());
-            return tarifaRepository.save(tarifa);
-        }).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tarifa no encontrada"));
-    }
-
-    // Eliminar tarifa
-    public void eliminarTarifa(Long id) {
-        if (!tarifaRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Tarifa no encontrada");
-        }
-        tarifaRepository.deleteById(id);
-    }*/
 }

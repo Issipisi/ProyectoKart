@@ -2,6 +2,8 @@ package com.example.Proyecto.entities;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
+
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
@@ -17,7 +19,6 @@ public class ClienteEntity {
     String email;
     //Para aplicar los descuentos a clientes frecuentes x mes
     int total_reservas;
-
 
 }
 

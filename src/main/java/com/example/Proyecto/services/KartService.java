@@ -25,10 +25,4 @@ public class KartService {
         return kartRepository.findAll();
     }
 
-    /*Buscar kart por codigo
-    public Optional<KartEntity> buscarPorCodigo(String codigo) {
-        return kartRepository.findByCodigo(codigo);
-    }*/
-
-
 }

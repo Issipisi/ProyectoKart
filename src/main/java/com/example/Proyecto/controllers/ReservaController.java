@@ -28,7 +28,6 @@ public class ReservaController {
             @RequestParam int cantidadVueltas,
             @RequestParam int cantidadPersonas,
             @RequestParam String fecha,
-            @RequestParam boolean clienteFrecuente,
             @RequestParam boolean diaEspecial
     ) {
         ReservaEntity reserva = reservaService.crearReserva(
@@ -36,7 +35,6 @@ public class ReservaController {
                 cantidadVueltas,
                 cantidadPersonas,
                 fecha,
-                clienteFrecuente,
                 diaEspecial
         );
         return ResponseEntity.ok(reserva);
@@ -54,12 +52,6 @@ public class ReservaController {
         return ResponseEntity.ok(reservaService.obtenerReservaDetalle(id));
     }
 
-    // Generar el comprobante
-    @GetMapping("/{id}/comprobante")
-    public ResponseEntity<String> generarComprobante(@PathVariable Long id) {
-        String comprobante = reservaService.generarComprobanteReserva(id);
-        return ResponseEntity.ok(comprobante);
-    }
 
     @GetMapping("/{id}/enviar-comprobante")
     public ResponseEntity<String> enviarComprobantePorCorreo(@PathVariable Long id) {
@@ -71,15 +63,19 @@ public class ReservaController {
         }
     }
 
-    // Reporte ingresos por vueltas
-    @GetMapping("/reporte-vueltas")
-    public ResponseEntity<Map<Integer, Double>> reporteIngresosPorVueltas() {
-        return ResponseEntity.ok(reservaService.calcularIngresosPorVueltas());
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminarReserva(@PathVariable Long id) {
+        reservaService.eliminarReserva(id);
+        return ResponseEntity.noContent().build(); // HTTP 204 NO CONTENT
     }
 
-    // Reporte ingresos por cantidad de personas
-    @GetMapping("/reporte-personas")
-    public ResponseEntity<Map<Integer, Double>> reporteIngresosPorPersonas() {
-        return ResponseEntity.ok(reservaService.calcularIngresosPorCantidadPersonas());
+    @GetMapping("/reporte-vueltas-mes")
+    public ResponseEntity<Map<String, Map<String, Double>>> reporteVueltasPorMes() {
+        return ResponseEntity.ok(reservaService.calcularIngresosPorVueltasPorMes());
+    }
+
+    @GetMapping("/reporte-personas-mes")
+    public ResponseEntity<Map<String, Map<String, Double>>> reportePersonasPorMes() {
+        return ResponseEntity.ok(reservaService.calcularIngresosPorPersonasPorMes());
     }
 }

@@ -1,5 +1,6 @@
 package com.example.Proyecto.services;
 
+import jakarta.transaction.Transactional;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.core.io.FileSystemResource;
@@ -16,16 +17,27 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.pdf.PdfWriter;
+import com.lowagie.text.Font;
+import com.lowagie.text.FontFactory;
+import com.lowagie.text.Element;
+
+import java.time.format.TextStyle;
+import java.util.Locale;
 
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.function.Function;
+
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
@@ -44,24 +56,31 @@ public class ReservaService {
     @Autowired
     private JavaMailSender mailSender;
 
+    @Transactional
     // Crear reserva
     public ReservaEntity crearReserva(
             Long clienteId,
             int cantidadVueltas,
             int cantidadPersonas,
             String fecha,
-            boolean clienteFrecuente,
             boolean diaEspecial
     ) {
         ClienteEntity cliente = clienteRepository.findById(clienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
 
+        // Aumentamos su contador de reservas
+        cliente.setTotal_reservas(cliente.getTotal_reservas() + 1);
+        clienteRepository.save(cliente); // Actualizamos cliente
+
         TarifaEntity tarifa = calcularTarifaAutomatica(cantidadVueltas, diaEspecial);
 
         double montoBase = tarifa.getCosto();
-        double descuento = calcularMejorDescuento(cantidadPersonas, clienteFrecuente, diaEspecial);
-        double montoFinal = montoBase * (1 - descuento);
-        String tipoDescuento = determinarTipoDescuento(descuento, cantidadPersonas, clienteFrecuente, diaEspecial);
+        double descuento = calcularMejorDescuento(cantidadPersonas, cliente, diaEspecial);
+        String tipoDescuento = determinarTipoDescuento(descuento, cantidadPersonas, cliente, diaEspecial);
+        double subtotal = montoBase * (1 - descuento);
+        double iva = subtotal * 0.19;
+        double montoFinal = subtotal + iva;
+        montoFinal = Math.round(montoFinal * 100.0) / 100.0; //Para que tenga pocos decimales
 
         LocalDateTime fechaHora = LocalDateTime.parse(fecha);
 
@@ -74,10 +93,11 @@ public class ReservaService {
                 .montoFinal(montoFinal)
                 .tipoDescuentoAplicado(tipoDescuento)
                 .build();
+
         return reservaRepository.save(reserva);
     }
 
-    // Calcula las tarifas de forma automática en base a la reserva
+    // Calcula las tarifas de forma automática
     private TarifaEntity calcularTarifaAutomatica(int vueltas, boolean diaEspecial) {
         int minutos = 0;
         double costo = 0;
@@ -116,21 +136,46 @@ public class ReservaService {
 
     }
 
-    // Lógica para calcular el mejor descuento desde backend
-    private double calcularMejorDescuento(int personas, boolean frecuente, boolean especial) {
-        double dGrupo = (personas >= 11) ? 0.30 : (personas >= 6) ? 0.20 : (personas >= 3) ? 0.10 : 0.0;
-        double dFrecuente = frecuente ? 0.30 : 0.0;
-        double dEspecial = especial ? 0.20 : 0.0;
-        return Math.max(dGrupo, Math.max(dFrecuente, dEspecial));
+    // Calcular descuento por número de personas
+    private double calcularDescuentoPorGrupo(int personas) {
+        if (personas >= 11) return 0.30;
+        if (personas >= 6) return 0.20;
+        if (personas >= 3) return 0.10;
+        return 0.0;
     }
 
-    private String determinarTipoDescuento(double descuento, int personas, boolean frecuente, boolean especial) {
-        if (frecuente && descuento == 0.30) return "FRECUENTE";
-        if (especial && descuento == 0.20) return "ESPECIAL";
-        if (personas >= 11 && descuento == 0.30) return "GRUPO 11+";
-        if (personas >= 6 && descuento == 0.20) return "GRUPO 6+";
-        if (personas >= 3 && descuento == 0.10) return "GRUPO 3+";
-        return "NINGUNO";
+    // Calcular descuento por frecuencia del cliente
+    private double calcularDescuentoPorClienteFrecuente(int totalReservasAlMes) {
+        if (totalReservasAlMes >= 7) return 0.30;
+        if (totalReservasAlMes >= 5) return 0.20;
+        if (totalReservasAlMes >= 2) return 0.10;
+        return 0.0;
+    }
+
+    // Determinar el mejor descuento automático
+    private double calcularMejorDescuento(int personas, ClienteEntity cliente, boolean diaEspecial) {
+        double descuentoGrupo = calcularDescuentoPorGrupo(personas);
+        double descuentoFidelidad = calcularDescuentoPorClienteFrecuente(cliente.getTotal_reservas());
+        double descuentoEspecial = diaEspecial ? 0.20 : 0.0;
+
+        // retorna el descuento más beneficioso
+        return Math.max(descuentoGrupo, Math.max(descuentoFidelidad, descuentoEspecial));
+    }
+
+    // Determinar tipo de descuento aplicado (comprobante)
+    private String determinarTipoDescuento(double descuento, int personas, ClienteEntity cliente, boolean diaEspecial) {
+        double descuentoGrupo = calcularDescuentoPorGrupo(personas);
+        double descuentoFidelidad = calcularDescuentoPorClienteFrecuente(cliente.getTotal_reservas());
+        double descuentoEspecial = diaEspecial ? 0.20 : 0.0;
+
+        if (descuento == descuentoFidelidad && descuento != 0.0) return "FRECUENTE";
+        if (descuento == descuentoEspecial && descuento != 0.0) return "DÍA ESPECIAL";
+        if (descuento == descuentoGrupo && descuento != 0.0) {
+            if (personas >= 11) return "GRUPO 11-15";
+            if (personas >= 6) return "GRUPO 6-10";
+            if (personas >= 3) return "GRUPO 3-5";
+        }
+        return "SIN DESCUENTO";
     }
 
     // Listar todas las reservas con nombres de cliente (modo texto)
@@ -159,7 +204,7 @@ public class ReservaService {
                 "\nMonto Final: $" + reserva.getMontoFinal();
     }
 
-    public String generarComprobanteReserva(Long reservaId) {
+    public File generarComprobantePDF(Long reservaId) throws IOException, DocumentException {
         ReservaEntity reserva = reservaRepository.findById(reservaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reserva no encontrada"));
 
@@ -169,42 +214,65 @@ public class ReservaService {
         TarifaEntity tarifa = tarifaRepository.findById(reserva.getTarifaId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tarifa no encontrada"));
 
-        double iva = reserva.getMontoFinal() * 0.19;  // IVA 19%
-        double totalConIVA = reserva.getMontoFinal() + iva;
-
-        // Comprobante en forma de Texto
-        String comprobante = "-------------------------------------------------\n" +
-                "COMPROBANTE DE RESERVA #" + reserva.getId() + "\n" +
-                "Fecha y Hora de Reserva: " + reserva.getFecha() + "\n" +
-                "Cliente: " + cliente.getNombre() + "\n" +
-                "Cantidad Personas: " + reserva.getCantidadPersonas() + "\n" +
-                "Número de Vueltas: " + tarifa.getVueltas() + " vueltas\n" +
-                "Duración Estimada: " + tarifa.getDuracion() + " minutos\n" +
-                "-------------------------------------------------\n" +
-                "Tarifa Base: $" + reserva.getMontoBase() + "\n" +
-                "Descuento aplicado: " + reserva.getTipoDescuentoAplicado() + "\n" +
-                "Monto Final sin IVA: $" + reserva.getMontoFinal() + "\n" +
-                "IVA (19%): $" + String.format("%.2f", iva) + "\n" +
-                "TOTAL a Pagar: $" + String.format("%.2f", totalConIVA) + "\n" +
-                "-------------------------------------------------";
-
-        return comprobante;
-    }
-
-    //Generar el archivo txt para el comprobante
-    public File generarComprobanteArchivo(Long reservaId) throws IOException {
-        String comprobanteTexto = generarComprobanteReserva(reservaId);
-
         // Crear archivo temporal
-        File file = File.createTempFile("comprobante_" + reservaId, ".txt");
-        FileWriter writer = new FileWriter(file);
-        writer.write(comprobanteTexto);
-        writer.close();
+        File file = File.createTempFile("comprobante_reserva_" + reservaId, ".pdf");
+
+        Document document = new Document();
+        PdfWriter.getInstance(document, new FileOutputStream(file));
+        document.open();
+
+        // Estilos
+        Font tituloFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
+        Font subTituloFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14);
+        Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 12);
+
+        // Título Principal
+        Paragraph titulo = new Paragraph("🏎️ COMPROBANTE DE RESERVA #" + reservaId, tituloFont);
+        titulo.setAlignment(Element.ALIGN_CENTER);
+        titulo.setSpacingAfter(20);
+        document.add(titulo);
+
+        // Información del cliente
+        document.add(new Paragraph(" Cliente: " + cliente.getNombre(), normalFont));
+        document.add(new Paragraph(" Correo: " + cliente.getEmail(), normalFont));
+        document.add(new Paragraph(" Fecha de la Reserva: " + (reserva.getFecha() != null ?
+                reserva.getFecha().toString().replace("T", " ") : "No Asignada")
+                , normalFont));
+        document.add(new Paragraph(" ", normalFont));
+
+        // Información de la Reserva
+        Paragraph sectionTitle = new Paragraph("Detalles de la Reserva:", subTituloFont);
+        sectionTitle.setSpacingBefore(10);
+        sectionTitle.setSpacingAfter(10);
+        document.add(sectionTitle);
+
+        document.add(new Paragraph(" Vueltas contratadas: " + tarifa.getVueltas(), normalFont));
+        document.add(new Paragraph(" Duración Estimada: " + tarifa.getDuracion() + " minutos", normalFont));
+        document.add(new Paragraph(" Cantidad de Personas: " + reserva.getCantidadPersonas(), normalFont));
+        document.add(new Paragraph(" Monto Base: $" + reserva.getMontoBase(), normalFont));
+        document.add(new Paragraph(" Descuento aplicado: " + reserva.getTipoDescuentoAplicado(), normalFont));
+        document.add(new Paragraph(" Subtotal: $" + (reserva.getMontoFinal() / 1.19), normalFont));
+        //Para que aparezca de forma correcta el IVA
+        double subtotal = reserva.getMontoFinal() / 1.19;
+        double iva = reserva.getMontoFinal() - subtotal;
+        document.add(new Paragraph(" IVA (19%): $" + iva, normalFont));
+        document.add(new Paragraph(" Total a Pagar: $" + reserva.getMontoFinal(), normalFont));
+
+        document.add(new Paragraph(" ", normalFont));
+        document.add(new Paragraph("-------------------------------------------"));
+
+        // Mensaje agradecimiento
+        Paragraph gracias = new Paragraph("¡Gracias por preferir nuestro Servicio de Karting! 🏁", normalFont);
+        gracias.setAlignment(Element.ALIGN_CENTER);
+        gracias.setSpacingBefore(20);
+        document.add(gracias);
+
+        document.close();
 
         return file;
     }
 
-    //Envía el comprobante por correo
+
     public void enviarComprobantePorCorreo(Long reservaId) throws Exception {
         ReservaEntity reserva = reservaRepository.findById(reservaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reserva no encontrada"));
@@ -212,50 +280,72 @@ public class ReservaService {
         ClienteEntity cliente = clienteRepository.findById(reserva.getClienteId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
 
-        File comprobante = generarComprobanteArchivo(reservaId);
+        // Generar comprobante en PDF
+        File comprobantePDF = generarComprobantePDF(reservaId);
 
         MimeMessage mensaje = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(mensaje, true);
 
         helper.setTo(cliente.getEmail());
-        helper.setSubject("Comprobante de Reserva #" + reserva.getId());
-        helper.setText("Estimado/a " + cliente.getNombre() + ",\n\nAdjunto encontrarás el comprobante de tu reserva.");
+        helper.setSubject(" Comprobante de Reserva #" + reservaId + " en KARTS");
+        helper.setText("¡Hola " + cliente.getNombre() + "!\n\nAdjuntamos tu comprobante de reserva"
+                + "\n Gracias por preferirnos. ");
 
-        // Agregar comprobante como adjunto
-        FileSystemResource file = new FileSystemResource(comprobante);
-        helper.addAttachment("comprobante_reserva_" + reservaId + ".txt", file);
+        FileSystemResource file = new FileSystemResource(comprobantePDF);
+        helper.addAttachment("comprobante_reserva_" + reservaId + ".pdf", file);
 
         mailSender.send(mensaje);
     }
 
-    // Reporte de ingresos agrupado por cantidad de vueltas
-    public Map<Integer, Double> calcularIngresosPorVueltas() {
-        List<ReservaEntity> reservas = reservaRepository.findAll();
-        Map<Integer, Double> ingresosPorVueltas = new HashMap<>();
-
-        for (ReservaEntity reserva : reservas) {
-            TarifaEntity tarifa = tarifaRepository.findById(reserva.getTarifaId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tarifa no encontrada"));
-
-            int vueltas = tarifa.getVueltas();
-            ingresosPorVueltas.put(vueltas, ingresosPorVueltas.getOrDefault(vueltas, 0.0) +
-                    reserva.getMontoFinal());
-        }
-
-        return ingresosPorVueltas;
+    // Reporte de ingresos agrupado por personas
+    public Map<String, Map<String, Double>> calcularIngresosPorPersonasPorMes() {
+        return calcularIngresosAgrupados(reserva -> {
+            int personas = reserva.getCantidadPersonas();
+            if (personas >= 1 && personas <= 2) return "1-2 personas";
+            else if (personas >= 3 && personas <= 5) return "3-5 personas";
+            else if (personas >= 6 && personas <= 10) return "6-10 personas";
+            else if (personas >= 11 && personas <= 15) return "11-15 personas";
+            else return "16 o más personas";
+        });
     }
 
-    // Reporte de ingresos agrupado por número de personas
-    public Map<Integer, Double> calcularIngresosPorCantidadPersonas() {
+    // Reporte de ingresos agrupado por vueltas
+    public Map<String, Map<String, Double>> calcularIngresosPorVueltasPorMes() {
+        return calcularIngresosAgrupados(reserva -> {
+            TarifaEntity tarifa = tarifaRepository.findById(reserva.getTarifaId())
+                    .orElseThrow(() -> new RuntimeException("Tarifa no encontrada"));
+            return tarifa.getVueltas() + " vueltas";
+        });
+    }
+
+    // Lo aplicamos para calcular los datos relacionados al mes en los reportes por personas o vueltas
+    private Map<String, Map<String, Double>> calcularIngresosAgrupados(Function<ReservaEntity, String> agrupador) {
         List<ReservaEntity> reservas = reservaRepository.findAll();
-        Map<Integer, Double> ingresosPorPersonas = new HashMap<>();
+        Map<String, Map<String, Double>> resultado = new HashMap<>();
 
         for (ReservaEntity reserva : reservas) {
-            int personas = reserva.getCantidadPersonas();
-            ingresosPorPersonas.put(personas, ingresosPorPersonas.getOrDefault(personas, 0.0) +
-                    reserva.getMontoFinal());
+            LocalDateTime fechaReserva = reserva.getFecha();
+            if (fechaReserva == null) continue;
+
+            String mes = fechaReserva.getMonth().getDisplayName(TextStyle.FULL, new Locale("es")).toUpperCase();
+            String claveAgrupacion = agrupador.apply(reserva);
+
+            resultado.putIfAbsent(claveAgrupacion, new HashMap<>());
+            Map<String, Double> ingresosPorMes = resultado.get(claveAgrupacion);
+
+            ingresosPorMes.put(mes, ingresosPorMes.getOrDefault(mes, 0.0) + reserva.getMontoFinal());
+            ingresosPorMes.put("TOTAL", ingresosPorMes.getOrDefault("TOTAL", 0.0) + reserva.getMontoFinal());
         }
-        return ingresosPorPersonas;
+
+        return resultado;
+    }
+
+    // Eliminar Reserva
+    public void eliminarReserva(Long id) {
+        reservaRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reserva no encontrada"));
+
+        reservaRepository.deleteById(id);
     }
 
 }
