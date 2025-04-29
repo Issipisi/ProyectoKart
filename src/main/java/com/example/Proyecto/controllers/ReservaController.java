@@ -2,12 +2,16 @@ package com.example.Proyecto.controllers;
 
 import com.example.Proyecto.entities.ReservaEntity;
 import com.example.Proyecto.services.ReservaService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import com.example.Proyecto.entities.ReservaEntity;
+import java.time.LocalDate;
 import java.util.Map;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Controller
 @RestController
@@ -78,4 +82,18 @@ public class ReservaController {
     public ResponseEntity<Map<String, Map<String, Double>>> reportePersonasPorMes() {
         return ResponseEntity.ok(reservaService.calcularIngresosPorPersonasPorMes());
     }
+
+    @GetMapping("/semana")
+    public Map<String, List<ReservaEntity>> getReservasSemana(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio) {
+
+        return reservaService.getReservasPorSemana(fechaInicio)
+                .entrySet()
+                .stream()
+                .collect(Collectors.toMap(
+                        entry -> entry.getKey().toString(),
+                        Map.Entry::getValue
+                ));
+    }
+
 }

@@ -25,6 +25,7 @@ import com.lowagie.text.Font;
 import com.lowagie.text.FontFactory;
 import com.lowagie.text.Element;
 
+import java.time.LocalDate;
 import java.time.format.TextStyle;
 import java.util.Locale;
 
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -338,6 +340,21 @@ public class ReservaService {
         }
 
         return resultado;
+    }
+
+    //Para realizar el Rack semanal
+    public Map<LocalDate, List<ReservaEntity>> getReservasPorSemana(LocalDate fechaInicio) {
+        LocalDate fechaFin = fechaInicio.plusDays(6); // Semana de 7 días
+        List<ReservaEntity> reservas = reservaRepository.findByFechaBetween(
+                fechaInicio.atStartOfDay(),
+                fechaFin.atTime(23, 59, 59)
+        );
+
+        // Agrupar por fecha (sin hora)
+        return reservas.stream()
+                .collect(Collectors.groupingBy(
+                        reserva -> reserva.getFecha().toLocalDate()
+                ));
     }
 
     // Eliminar Reserva

@@ -16,6 +16,7 @@ public class ClienteService {
     @Autowired
     private ClienteRepository clienteRepository;
 
+
     // Crear un nuevo cliente
     public ClienteEntity registrarCliente(ClienteEntity cliente) {
         return clienteRepository.save(cliente);

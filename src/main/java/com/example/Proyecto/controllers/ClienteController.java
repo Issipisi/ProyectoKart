@@ -44,24 +44,7 @@ public class ClienteController {
         return ResponseEntity.ok(clientes);
     }
 
-    /* Obtener cliente por nombre
-    @GetMapping("/buscarPorNombre")
-    public ResponseEntity<ClienteEntity> buscarPorNombre(@RequestParam String nombre) {
-        Optional<ClienteEntity> cliente = clienteService.buscarPorNombre(nombre);
-        return cliente.map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
-    }*/
 
-    /* Actualizar cliente
-    @PutMapping("/{id}")
-    public ResponseEntity<ClienteEntity> actualizarCliente(@PathVariable Long id, @RequestBody ClienteEntity clienteActualizado) {
-        try {
-            ClienteEntity cliente = clienteService.actualizarCliente(id, clienteActualizado);
-            return ResponseEntity.ok(cliente);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }*/
 
     /*Eliminar cliente
     @DeleteMapping("/{id}")
