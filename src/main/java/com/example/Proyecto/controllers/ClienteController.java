@@ -12,7 +12,10 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {
+        "http://localhost:5173",
+        "http://40.82.176.155"
+})
 @RequestMapping("/api/clientes") // Ruta base para todas las operaciones de Cliente
 public class ClienteController {
 

@@ -15,7 +15,10 @@ import java.util.stream.Collectors;
 
 @Controller
 @RestController
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {
+        "http://localhost:5173",
+        "http://40.82.176.155"
+})
 @RequestMapping("/api/reservas")
 public class ReservaController {
 

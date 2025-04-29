@@ -10,7 +10,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Optional;
 
-@CrossOrigin(origins = "http://localhost:5173") // 5173 = puerto Vite en dev
+@CrossOrigin(origins = {
+        "http://localhost:5173",
+        "http://40.82.176.155"
+})
 @RestController
 @RequestMapping("/api/karts")
 public class KartController {
