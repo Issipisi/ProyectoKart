@@ -350,7 +350,7 @@ public class ReservaService {
                 fechaFin.atTime(23, 59, 59)
         );
 
-        // Agrupar por fecha (sin hora)
+        // Agrupar por fecha
         return reservas.stream()
                 .collect(Collectors.groupingBy(
                         reserva -> reserva.getFecha().toLocalDate()
