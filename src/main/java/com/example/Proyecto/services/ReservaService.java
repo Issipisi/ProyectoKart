@@ -36,9 +36,8 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
+
 
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -56,6 +55,9 @@ public class ReservaService {
     private TarifaRepository tarifaRepository;
 
     @Autowired
+    private TarifaService tarifaService;
+
+    @Autowired
     private JavaMailSender mailSender;
 
     @Transactional
@@ -65,7 +67,8 @@ public class ReservaService {
             int cantidadVueltas,
             int cantidadPersonas,
             String fecha,
-            boolean diaEspecial
+            boolean diaEspecial,
+            boolean cumpleanos
     ) {
         ClienteEntity cliente = clienteRepository.findById(clienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
@@ -74,11 +77,12 @@ public class ReservaService {
         cliente.setTotal_reservas(cliente.getTotal_reservas() + 1);
         clienteRepository.save(cliente); // Actualizamos cliente
 
-        TarifaEntity tarifa = calcularTarifaAutomatica(cantidadVueltas, diaEspecial);
+        // Crear o buscar tarifa
+        TarifaEntity tarifa = tarifaService.buscarOCrearTarifa(cantidadVueltas, diaEspecial);
 
         double montoBase = tarifa.getCosto();
-        double descuento = calcularMejorDescuento(cantidadPersonas, cliente, diaEspecial);
-        String tipoDescuento = determinarTipoDescuento(descuento, cantidadPersonas, cliente, diaEspecial);
+        double descuento = calcularMejorDescuento(cantidadPersonas, cliente, diaEspecial, cumpleanos);
+        String tipoDescuento = determinarTipoDescuento(descuento, cantidadPersonas, cliente, diaEspecial, cumpleanos);
         double subtotal = montoBase * (1 - descuento);
         double iva = subtotal * 0.19;
         double montoFinal = subtotal + iva;
@@ -99,43 +103,9 @@ public class ReservaService {
         return reservaRepository.save(reserva);
     }
 
-    // Calcula las tarifas de forma automática
-    private TarifaEntity calcularTarifaAutomatica(int vueltas, boolean diaEspecial) {
-        int minutos = 0;
-        double costo = 0;
-
-        switch (vueltas) {
-            case 10:
-                minutos = 30;
-                costo = diaEspecial ? 18000 : 15000;
-                break;
-            case 15:
-                minutos = 35;
-                costo = diaEspecial ? 23000 : 20000;
-                break;
-            case 20:
-                minutos = 40;
-                costo = diaEspecial ? 28000 : 25000;
-                break;
-            default:
-                throw new IllegalArgumentException("Número de vueltas invalid");
-        }
-        Optional<TarifaEntity> tarifaExistente = tarifaRepository.findByVueltasAndCostoAndDuracion(
-                vueltas, costo, minutos
-        );
-
-        if (tarifaExistente.isPresent()) {
-            return tarifaExistente.get();
-        } else {
-            // Crear nueva tarifa
-            TarifaEntity nuevaTarifa = TarifaEntity.builder()
-                    .vueltas(vueltas)
-                    .duracion(minutos)
-                    .costo(costo)
-                    .build();
-            return tarifaRepository.save(nuevaTarifa);
-        }
-
+    // Calcular descuento de cumpleaños
+    private double calcularDescuentoCumpleanos(boolean cumpleanos) {
+        return cumpleanos ? 0.50 : 0.0;  // 50% de descuento
     }
 
     // Calcular descuento por número de personas
@@ -155,21 +125,29 @@ public class ReservaService {
     }
 
     // Determinar el mejor descuento automático
-    private double calcularMejorDescuento(int personas, ClienteEntity cliente, boolean diaEspecial) {
+    private double calcularMejorDescuento(int personas, ClienteEntity cliente, boolean diaEspecial, boolean cumpleanos) {
         double descuentoGrupo = calcularDescuentoPorGrupo(personas);
         double descuentoFidelidad = calcularDescuentoPorClienteFrecuente(cliente.getTotal_reservas());
         double descuentoEspecial = diaEspecial ? 0.20 : 0.0;
+        double descuentoCumpleanos = calcularDescuentoCumpleanos(cumpleanos);
 
-        // retorna el descuento más beneficioso
-        return Math.max(descuentoGrupo, Math.max(descuentoFidelidad, descuentoEspecial));
+        // retorna el descuento más alto de los cuatro
+        return Math.max(
+                descuentoCumpleanos,
+                Math.max(descuentoGrupo, Math.max(descuentoFidelidad, descuentoEspecial))
+        );
     }
 
+
     // Determinar tipo de descuento aplicado (comprobante)
-    private String determinarTipoDescuento(double descuento, int personas, ClienteEntity cliente, boolean diaEspecial) {
+    private String determinarTipoDescuento(double descuento, int personas, ClienteEntity cliente,
+            boolean diaEspecial, boolean cumpleanos) {
         double descuentoGrupo = calcularDescuentoPorGrupo(personas);
         double descuentoFidelidad = calcularDescuentoPorClienteFrecuente(cliente.getTotal_reservas());
         double descuentoEspecial = diaEspecial ? 0.20 : 0.0;
+        double descuentoCumpleanos = calcularDescuentoCumpleanos(cumpleanos);
 
+        if (descuento == descuentoCumpleanos && descuento != 0.0) return "CUMPLEAÑOS";
         if (descuento == descuentoFidelidad && descuento != 0.0) return "FRECUENTE";
         if (descuento == descuentoEspecial && descuento != 0.0) return "DÍA ESPECIAL";
         if (descuento == descuentoGrupo && descuento != 0.0) {
@@ -299,7 +277,7 @@ public class ReservaService {
         mailSender.send(mensaje);
     }
 
-    // Reporte de ingresos agrupado por personas
+    /* Reporte de ingresos agrupado por personas
     public Map<String, Map<String, Double>> calcularIngresosPorPersonasPorMes() {
         return calcularIngresosAgrupados(reserva -> {
             int personas = reserva.getCantidadPersonas();
@@ -339,6 +317,67 @@ public class ReservaService {
             ingresosPorMes.put("TOTAL", ingresosPorMes.getOrDefault("TOTAL", 0.0) + reserva.getMontoFinal());
         }
 
+        return resultado;
+    }*/
+
+    // Reporte de ingresos por vueltas por mes
+    public Map<String, Map<String, Double>> calcularIngresosPorVueltasPorMes(int mesInicio, int mesFin, int anio) {
+        List<ReservaEntity> reservas = reservaRepository.findAll();
+        Map<String, Map<String, Double>> resultado = new HashMap<>();
+
+        for (ReservaEntity reserva : reservas) {
+            LocalDateTime fechaReserva = reserva.getFecha();
+            if (fechaReserva == null) continue;
+
+            int mes = fechaReserva.getMonthValue();
+            int anyo = fechaReserva.getYear();
+            if (anyo != anio || mes < mesInicio || mes > mesFin) continue;
+
+            String mesTexto = fechaReserva.getMonth().getDisplayName(TextStyle.FULL, new Locale("es")).toUpperCase();
+
+            TarifaEntity tarifa = tarifaRepository.findById(reserva.getTarifaId())
+                    .orElseThrow(() -> new RuntimeException("Tarifa no encontrada"));
+            String grupo = tarifa.getVueltas() + " vueltas";
+
+            resultado.putIfAbsent(grupo, new HashMap<>());
+            Map<String, Double> ingresosPorMes = resultado.get(grupo);
+
+            ingresosPorMes.put(mesTexto, ingresosPorMes.getOrDefault(mesTexto, 0.0) + reserva.getMontoFinal());
+            ingresosPorMes.put("TOTAL", ingresosPorMes.getOrDefault("TOTAL", 0.0) + reserva.getMontoFinal());
+        }
+        return resultado;
+    }
+
+
+    // Reporte de ingresos por personas por mes
+    public Map<String, Map<String, Double>> calcularIngresosPorPersonasPorMes(int mesInicio, int mesFin, int anio) {
+        List<ReservaEntity> reservas = reservaRepository.findAll();
+        Map<String, Map<String, Double>> resultado = new HashMap<>();
+
+        for (ReservaEntity reserva : reservas) {
+            LocalDateTime fechaReserva = reserva.getFecha();
+            if (fechaReserva == null) continue;
+
+            int mes = fechaReserva.getMonthValue();
+            int anyo = fechaReserva.getYear();
+            if (anyo != anio || mes < mesInicio || mes > mesFin) continue;
+
+            String mesTexto = fechaReserva.getMonth().getDisplayName(TextStyle.FULL, new Locale("es")).toUpperCase();
+
+            int personas = reserva.getCantidadPersonas();
+            String grupo = "";
+            if (personas >= 1 && personas <= 2) grupo = "1-2 personas";
+            else if (personas >= 3 && personas <= 5) grupo = "3-5 personas";
+            else if (personas >= 6 && personas <= 10) grupo = "6-10 personas";
+            else if (personas >= 11 && personas <= 15) grupo = "11-15 personas";
+            else grupo = "16 o más personas";
+
+            resultado.putIfAbsent(grupo, new HashMap<>());
+            Map<String, Double> ingresosPorMes = resultado.get(grupo);
+
+            ingresosPorMes.put(mesTexto, ingresosPorMes.getOrDefault(mesTexto, 0.0) + reserva.getMontoFinal());
+            ingresosPorMes.put("TOTAL", ingresosPorMes.getOrDefault("TOTAL", 0.0) + reserva.getMontoFinal());
+        }
         return resultado;
     }
 

@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 @Controller
 @RestController
 @CrossOrigin(origins = {
-        "http://localhost:5173",
+        "http://localhost:5174",
         "http://40.82.176.155"
 })
 @RequestMapping("/api/reservas")
@@ -35,14 +35,16 @@ public class ReservaController {
             @RequestParam int cantidadVueltas,
             @RequestParam int cantidadPersonas,
             @RequestParam String fecha,
-            @RequestParam boolean diaEspecial
+            @RequestParam boolean diaEspecial,
+            @RequestParam boolean cumpleanos
     ) {
         ReservaEntity reserva = reservaService.crearReserva(
                 clienteId,
                 cantidadVueltas,
                 cantidadPersonas,
                 fecha,
-                diaEspecial
+                diaEspecial,
+                cumpleanos
         );
         return ResponseEntity.ok(reserva);
     }
@@ -76,14 +78,29 @@ public class ReservaController {
         return ResponseEntity.noContent().build(); // HTTP 204 NO CONTENT
     }
 
-    @GetMapping("/reporte-vueltas-mes")
-    public ResponseEntity<Map<String, Map<String, Double>>> reporteVueltasPorMes() {
+    /*@GetMapping("/reporte-vueltas-mes")
+    public ResponseEntity<Map<String, Map<String, Double>>> reporteVueltasPorMes(
+            @RequestParam int mesInicio,
+            @RequestParam int mesFin,
+            @RequestParam int anio
+    ) {
         return ResponseEntity.ok(reservaService.calcularIngresosPorVueltasPorMes());
+    }*/
+
+    @GetMapping("/reporte-vueltas-mes")
+    public ResponseEntity<Map<String, Map<String, Double>>> reporteVueltasPorMes(
+            @RequestParam int mesInicio,
+            @RequestParam int mesFin,
+            @RequestParam int anio) {
+        return ResponseEntity.ok(reservaService.calcularIngresosPorVueltasPorMes(mesInicio, mesFin, anio));
     }
 
     @GetMapping("/reporte-personas-mes")
-    public ResponseEntity<Map<String, Map<String, Double>>> reportePersonasPorMes() {
-        return ResponseEntity.ok(reservaService.calcularIngresosPorPersonasPorMes());
+    public ResponseEntity<Map<String, Map<String, Double>>> reportePersonasPorMes(
+            @RequestParam int mesInicio,
+            @RequestParam int mesFin,
+            @RequestParam int anio) {
+        return ResponseEntity.ok(reservaService.calcularIngresosPorPersonasPorMes(mesInicio, mesFin, anio));
     }
 
     @GetMapping("/semana")

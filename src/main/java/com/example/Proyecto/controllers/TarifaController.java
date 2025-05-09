@@ -11,7 +11,7 @@ import java.util.Optional;
 
 @RestController
 @CrossOrigin(origins = {
-        "http://localhost:5173",
+        "http://localhost:5174",
         "http://40.82.176.155"
 })
 @RequestMapping("/api/tarifas")
@@ -25,11 +25,12 @@ public class TarifaController {
 
     // Crear nueva tarifa
     @PostMapping
-    public ResponseEntity<TarifaEntity> crearTarifa(@RequestBody TarifaEntity tarifa) {
-        TarifaEntity nueva = tarifaService.crearTarifa(tarifa);
-        return new ResponseEntity<>(nueva, HttpStatus.CREATED);
+    public ResponseEntity<TarifaEntity> buscarOCrearTarifa(
+            @RequestParam int vueltas,
+            @RequestParam boolean diaEspecial) {
+        TarifaEntity tarifa = tarifaService.buscarOCrearTarifa(vueltas, diaEspecial);
+        return new ResponseEntity<>(tarifa, HttpStatus.OK);
     }
-
     // Buscar tarifa por cantidad de vueltas
     @GetMapping("/buscarPorVueltas")
     public ResponseEntity<TarifaEntity> buscarPorVueltas(@RequestParam int vueltas) {

@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 @CrossOrigin(origins = {
-        "http://localhost:5173",
+        "http://localhost:5174",
         "http://40.82.176.155"
 })
 @RestController
@@ -31,7 +31,7 @@ public class KartController {
         return new ResponseEntity<>(kartCreado, HttpStatus.CREATED);
     }
 
-    // Listar todos los kart
+    // Listar todos kart
     @GetMapping
     public ResponseEntity<List<KartEntity>> listarKarts() {
         List<KartEntity> karts = kartService.obtenerTodosLosKart();
